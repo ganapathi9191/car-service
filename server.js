@@ -2,12 +2,11 @@ import express from "express";
 import http from "http";
 import mongoose from "mongoose";
 import cors from "cors";
-import dotenv from "dotenv";
 import { Server } from "socket.io";
 import auth from "./routes/authroute.js";
 
-
-dotenv.config();
+import dotenv from "dotenv";
+dotenv.config(); // MUST be first
 
 const app = express();
 const server = http.createServer(app);
@@ -15,6 +14,11 @@ const server = http.createServer(app);
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// this is debug line
+console.log("JWT_SECRET loaded:", process.env.JWT_SECRET ? "✅ Yes" : "❌ No");
+
+
 
 // ✅ Connect to MongoDB and create default admin
 mongoose.connect(process.env.MONGO_URI)

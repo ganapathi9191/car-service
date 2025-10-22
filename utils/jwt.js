@@ -1,11 +1,18 @@
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = "your_jwt_secret";
+// Don't assign at module load time - get it dynamically
+const getJwtSecret = () => {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error("JWT_SECRET is not defined in environment variables");
+  }
+  return secret;
+};
 
-export const generateToken = (payload, expiresIn = "5m") => {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn });
+export const generateToken = (payload, expiresIn = "15m") => {
+  return jwt.sign(payload, getJwtSecret(), { expiresIn });
 };
 
 export const verifyToken = (token) => {
-  return jwt.verify(token, JWT_SECRET);
+  return jwt.verify(token, getJwtSecret());
 };
