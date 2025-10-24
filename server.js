@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import cors from "cors";
 import { Server } from "socket.io";
 import auth from "./routes/authroute.js";
+import category from "./routes/categoryRoute.js"
 
 import dotenv from "dotenv";
 dotenv.config(); // MUST be first
@@ -31,6 +32,7 @@ mongoose.connect(process.env.MONGO_URI)
 
 // Routes
 app.use("/api",auth);
+app.use("/api",category);
 
 
 // Socket.IO

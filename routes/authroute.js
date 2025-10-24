@@ -30,7 +30,7 @@ router.delete("/delete-profile/:userId", user.deleteUserProfile);
 
 
 // Upload multiple banner images
-router.post("/upload-banner", upload.array("images"), user.uploadBannerImages);
+router.post("/upload-banner", upload.any(), user.uploadBannerImages);
 router.get("/get-banners", user.getAllBanners);
 router.get("/get-banner/:id", user.getBannerById);
 router.put("/update-banner/:id", upload.array("images"), user.updateBannerImages);
