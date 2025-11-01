@@ -9,30 +9,36 @@ const generateReferralCode = () => Math.random().toString(36).substring(2, 8).to
 
 // 📌 REGISTER USER
 export const registerUser = async (req, res) => {
-  try {
-    const { name, email, mobile, code } = req.body;
+   try {
+    const { name, email, mobile, code } = req.body; // code is referral code sent by client
 
+    // Check if user already exists
     const existingUser = await User.findOne({ $or: [{ email }, { mobile }] });
-    if (existingUser)
+    if (existingUser) {
       return res.status(400).json({ message: "User already exists!" });
+    }
 
+    // Generate user's own referral code
     const referralCode = generateReferralCode();
 
     const newUser = new User({
       name,
       email,
       mobile,
-      code: referralCode,
+      code: referralCode, // store user's own referral code
+      points: 0,
     });
 
-    // Referral logic
+    // Referral logic (case-insensitive lookup)
     if (code) {
-      const referrer = await User.findOne({ code });
+      const referrer = await User.findOne({ code: code.toUpperCase() });
       if (referrer) {
-        newUser.referredBy = referrer._id;
-        newUser.points = 50;
-        referrer.points += 50;
+        newUser.referredBy = referrer._id; // link referrer
+        newUser.points = 50;               // new user gets 50 points
+        referrer.points += 50;             // referrer gets 50 points
         await referrer.save();
+      } else {
+        console.log(`Referral code "${code}" not found. No points awarded.`);
       }
     }
 
@@ -42,8 +48,9 @@ export const registerUser = async (req, res) => {
       message: "Registration successful",
       user: newUser,
     });
+
   } catch (err) {
-    console.error(err);
+    console.error("❌ Registration error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -114,7 +121,7 @@ export const verifyOtp = async (req, res) => {
 
     // Decode JWT
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id);
+    const user = await User.findById(decoded.id).select("-otp -otpExpires -__v");
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -125,12 +132,23 @@ export const verifyOtp = async (req, res) => {
       return res.status(400).json({ message: "Invalid OTP" });
     }
 
-    // Mark verified
-    user.isVerified = true;
-    await user.save();
+    // Mark verified if not already
+    if (!user.isVerified) {
+      user.isVerified = true;
+      await user.save();
+    }
 
-    res.status(200).json({ success: true, message: "OTP verified successfully" });
+    // Generate a new token after verification
+    const newToken = generateToken({ id: user._id });
+
+    res.status(200).json({
+      success: true,
+      message: "OTP verified successfully",
+      token: newToken,
+      user, // ✅ return user details here
+    });
   } catch (error) {
+    console.error("❌ OTP verification error:", error);
     res.status(500).json({ message: error.message });
   }
 };
