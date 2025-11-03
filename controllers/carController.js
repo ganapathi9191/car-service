@@ -15,16 +15,27 @@ export const createCar = async (req, res) => {
       perDayCost,
       delayCost,
       liveLocation,
-      categoryId, // ✅ new
+      categoryId,
     } = req.body;
+
+    // ✅ Check if carnumber already exists
+    const existingCar = await Car.findOne({ carnumber: carNumber });
+    if (existingCar) {
+      return res.status(400).json({
+        success: false,
+        message: `Car number "${carNumber}" already exists.`,
+      });
+    }
 
     // ✅ Validate category
     const category = await Category.findById(categoryId);
     if (!category) {
-      return res.status(404).json({ message: "Invalid categoryId — Category not found" });
+      return res
+        .status(404)
+        .json({ message: "Invalid categoryId — Category not found" });
     }
 
-    // ✅ Handle uploaded files (since using upload.any())
+    // ✅ Handle uploaded files
     const files = req.files || [];
     const logoFile = files.find((file) => file.fieldname === "logo");
     const carImageFile = files.find((file) => file.fieldname === "carImage");
@@ -33,7 +44,9 @@ export const createCar = async (req, res) => {
     const carImage = carImageFile ? carImageFile.path : null;
 
     if (!logo || !carImage) {
-      return res.status(400).json({ message: "Logo and Car image are required" });
+      return res
+        .status(400)
+        .json({ message: "Logo and Car image are required" });
     }
 
     // ✅ Parse location
@@ -45,7 +58,7 @@ export const createCar = async (req, res) => {
       return res.status(400).json({ message: "Invalid liveLocation format" });
     }
 
-    // ✅ Create car document
+    // ✅ Create new car
     const newCar = new Car({
       name,
       logo,
@@ -58,7 +71,7 @@ export const createCar = async (req, res) => {
       perDayCost: parseFloat(perDayCost),
       delayCost: parseFloat(delayCost),
       carImage,
-      categoryId, // ✅ linked category
+      categoryId,
       liveLocation: {
         type: "Point",
         coordinates: locationCoords,
@@ -69,7 +82,9 @@ export const createCar = async (req, res) => {
     res.status(201).json({ success: true, car: savedCar });
   } catch (error) {
     console.error("Create Car Error:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Server error", error: error.message });
   }
 };
 
