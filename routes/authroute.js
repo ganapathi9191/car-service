@@ -1,44 +1,68 @@
-import express from "express";
-import * as user from "../controllers/authcontroller.js";
+import express from 'express';
 import upload from "../utils/multer.js";
-
+import {
+  registerUser,
+  loginUser,
+  resendOTP,
+  verifyOtp,
+  getUser,
+  createProfile,
+  editProfileImage,
+  getProfile,
+  createBooking,
+  payForBooking,
+  getUserBookings,
+  getBookingSummary,
+  getRecentBooking,
+  extendBooking,
+  addToWallet,
+  getWalletTransactions,
+  uploadUserDocuments,
+  getUserDocuments,
+  getReferralCode,
+  updateUserLocation,
+  getNearestBranch,
+  deleteAccount,
+} from '../controllers/authcontroller.js';
 
 const router = express.Router();
 
 // Auth routes
-router.post("/register", user.registerUser);
-router.post("/login", user.loginUser);
-router.post("/resend-otp",user.resendOTP);
-router.post("/verify-otp", user.verifyOtp);
+router.post('/register', registerUser);
+router.post('/login', loginUser);
+router.post('/resend-otp', resendOTP);
+router.post('/verify-otp', verifyOtp);
 
-// Documents
-router.post("/upload-docs/:userId",upload.any(), user.uploadUserDocuments);
-router.get("/get-docs/:userId", user.getUserDocuments);
+// User profile routes
+router.get('/user/:userId', getUser);
+router.post('/profile/:userId', createProfile);
+router.put('/profile/:userId/edit', editProfileImage);
+router.get('/profile/:id', getProfile);
 
-// Referral
-router.get("/referral/:userId", user.getReferralCode);
+// Booking routes
+router.post('/booking', createBooking);
+router.post('/booking/:userId/:bookingId/pay', payForBooking);
+router.get('/bookings/:userId', getUserBookings);
+router.get('/booking/:userId/:bookingId/summary', getBookingSummary);
+router.get('/booking/:userId/recent', getRecentBooking);
+router.put('/booking/:userId/:bookingId/extend', extendBooking);
 
-// Location
-router.post("/update-location", user.updateUserLocation);
+// Wallet routes
+router.post('/wallet/:userId/add', addToWallet);
+router.get('/wallet/:userId/transactions', getWalletTransactions);
 
+// Document routes
+router.post("/:userId/upload", upload.any(), uploadUserDocuments);
+router.get('/documents/:userId', getUserDocuments);
 
-// Update profile (with optional profile image)
-router.put("/profile-update/:userId", upload.single("profileImage"), user.updateUserProfile);
-router.get("/grt-profile/:userId", user.getUserProfile);
-router.delete("/delete-profile/:userId", user.deleteUserProfile);
+// Referral route
+router.get('/referral/:userId', getReferralCode);
 
+// Location routes
+router.post('/location/update', updateUserLocation);
+router.get('/location/:userId/nearest-branch', getNearestBranch);
 
-
-// Upload multiple banner images
-router.post("/upload-banner", upload.any(), user.uploadBannerImages);
-router.get("/get-banners", user.getAllBanners);
-router.get("/get-banner/:id", user.getBannerById);
-router.put("/update-banner/:id", upload.array("images"), user.updateBannerImages);
-router.delete("/delete-banner/:id", user.deleteBanner);
-
-
-
-
-
+// Account deletion
+router.post('/account/:userId/delete', deleteAccount);
 
 export default router;
