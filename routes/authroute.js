@@ -35,8 +35,8 @@ router.post('/verify-otp', verifyOtp);
 
 // User profile routes
 router.get('/user/:userId', getUser);
-router.post('/profile/:userId', createProfile);
-router.put('/profile/:userId/edit', editProfileImage);
+router.post('/profile/:userId', upload.single("profileImage"),createProfile);
+router.put('/profile/:userId/edit', upload.single("profileImage"),editProfileImage);
 router.get('/profile/:id', getProfile);
 
 // Booking routes

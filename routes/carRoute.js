@@ -1,6 +1,6 @@
 import express from 'express';
-import { addCar, getAllCars, getCarById, updateCar, deleteCar, createBanner, getBanners, updateBanner, deleteBanner, AllCars } from '../controllers/carController.js'
-
+import { addCar, getAllCars, getCarById, updateCar,getBannerById, deleteCar, createBanner, getBanners, updateBanner, deleteBanner, AllCars } from '../controllers/carController.js'
+import upload from "../utils/multer.js";
 const router = express.Router();
 
 
@@ -18,11 +18,10 @@ router.get('/getcar/:carId', getCarById);
 router.put('/updatecar/:carId', updateCar);
 
 // Route to delete a car by ID
-router.delete('/deletecar/:carId', deleteCar);
-router.post('/bannercreate', createBanner);
+router.post('/bannercreate', upload.array("bannerImages"), createBanner);
 router.get('/allbanner', getBanners);
-router.put('/updatebanner/:bannerId', updateBanner);
+router.get('/banner/:bannerId', getBannerById);
+router.put('/updatebanner/:bannerId', upload.array("bannerImages"), updateBanner);
 router.delete('/deletebanner/:bannerId', deleteBanner);
-
 
 export default router;

@@ -249,29 +249,30 @@ export const createProfile = async (req, res) => {
       return res.status(404).json({ message: 'User not found!' });
     }
 
-    if (!req.files || !req.files.profileImage) {
+    // multer gives file in req.file, not req.files
+    if (!req.file) {
       return res.status(400).json({ message: 'No file uploaded!' });
     }
 
-    const profileImage = req.files.profileImage;
-
-    const uploadedImage = await cloudinary.uploader.upload(profileImage.tempFilePath, {
-      folder: 'poster',
+    // Upload to cloudinary
+    const uploadedImage = await cloudinary.uploader.upload(req.file.path, {
+      folder: "poster",
     });
 
     existingUser.profileImage = uploadedImage.secure_url;
     await existingUser.save();
 
     return res.status(200).json({
-      message: 'Profile image uploaded successfully!',
+      message: "Profile image uploaded successfully!",
       user: {
         id: existingUser._id,
         profileImage: existingUser.profileImage,
       },
     });
+
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: 'Server error' });
+    console.error("Profile upload error:", error);
+    return res.status(500).json({ message: "Server error" });
   }
 };
 
@@ -281,32 +282,31 @@ export const editProfileImage = async (req, res) => {
 
     const existingUser = await User.findById(userId);
     if (!existingUser) {
-      return res.status(404).json({ message: 'User not found!' });
+      return res.status(404).json({ message: "User not found!" });
     }
 
-    if (!req.files || !req.files.profileImage) {
-      return res.status(400).json({ message: 'No new file uploaded!' });
+    if (!req.file) {
+      return res.status(400).json({ message: "No new file uploaded!" });
     }
 
-    const newProfileImage = req.files.profileImage;
-
-    const uploadedImage = await cloudinary.uploader.upload(newProfileImage.tempFilePath, {
-      folder: 'poster',
+    const uploadedImage = await cloudinary.uploader.upload(req.file.path, {
+      folder: "poster",
     });
 
     existingUser.profileImage = uploadedImage.secure_url;
     await existingUser.save();
 
     return res.status(200).json({
-      message: 'Profile image updated successfully!',
+      message: "Profile image updated successfully!",
       user: {
         id: existingUser._id,
         profileImage: existingUser.profileImage,
       },
     });
+
   } catch (error) {
-    console.error('Error updating profile image:', error);
-    return res.status(500).json({ message: 'Server error' });
+    console.error("Error updating profile image:", error);
+    return res.status(500).json({ message: "Server error" });
   }
 };
 

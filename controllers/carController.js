@@ -605,124 +605,150 @@ export const createDeposit = async (req, res) => {
 };
 
 
+// ⭐ CREATE BANNER
 export const createBanner = async (req, res) => {
   try {
+    let imageUrls = [];
 
-    // Ensure images is always an array
-    const images = Array.isArray(req.files.images) ? req.files.images : [req.files.images];
+    // If images uploaded via multer
+    if (req.files && req.files.length > 0) {
+      imageUrls = req.files.map((file) => file.path);
+    }
 
-    // Upload each image using the same cloudinary method as createProfile
-    const uploadedImages = await Promise.all(
-      images.map((img) =>
-        cloudinary.uploader.upload(img.tempFilePath, {
-          folder: 'banners',
-        })
-      )
-    );
-
-    // Extract URLs
-    const imageUrls = uploadedImages.map((img) => img.secure_url);
-
-    // Save to DB
-    const banner = new Banner({ images: imageUrls });
-    await banner.save();
+    const banner = await Banner.create({
+      images: imageUrls,
+    });
 
     return res.status(201).json({
-      message: 'Banner created successfully!',
+      message: "Banner created successfully!",
       banner,
     });
+
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: 'Server error', error: error.message });
+    console.error("Create Banner Error:", error);
+    return res.status(500).json({ message: "Error creating banner", error: error.message });
   }
 };
 
 
+
+// ⭐ UPDATE BANNER
 export const updateBanner = async (req, res) => {
   try {
     const { bannerId } = req.params;
-    if (!bannerId) return res.status(400).json({ message: 'Banner ID is required' });
+
+    if (!bannerId) {
+      return res.status(400).json({ message: "Banner ID is required" });
+    }
 
     let imageUrls = [];
 
-    if (req.files && req.files.images) {
-      const images = Array.isArray(req.files.images) ? req.files.images : [req.files.images];
+    // If new files uploaded (multer handles upload directly to Cloudinary)
+    if (req.files && req.files.length > 0) {
+      imageUrls = req.files.map((file) => file.path);
+    }
 
-      const uploadedImages = await Promise.all(
-        images.map((img) =>
-          cloudinary.uploader.upload(img.tempFilePath, {
-            folder: 'banners',
-          })
-        )
-      );
-
-      imageUrls = uploadedImages.map((img) => img.secure_url);
-    } else if (req.body.images) {
-      if (typeof req.body.images === 'string') {
-        imageUrls = [req.body.images];
+    // If user sends images in body
+    if (req.body.images) {
+      if (typeof req.body.images === "string") {
+        imageUrls.push(req.body.images);
       } else if (Array.isArray(req.body.images)) {
-        imageUrls = req.body.images;
+        imageUrls.push(...req.body.images);
       }
     }
 
     const updatedBanner = await Banner.findByIdAndUpdate(
       bannerId,
       { images: imageUrls.length > 0 ? imageUrls : undefined },
-      { new: true, runValidators: true }
+      { new: true }
     );
 
     if (!updatedBanner) {
-      return res.status(404).json({ message: 'Banner not found' });
+      return res.status(404).json({ message: "Banner not found" });
     }
 
     return res.status(200).json({
-      message: 'Banner updated successfully!',
+      message: "Banner updated successfully!",
       banner: updatedBanner,
     });
+
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: 'Error updating banner', error: error.message });
+    console.error("Update Banner Error:", error);
+    return res.status(500).json({ message: "Error updating banner", error: error.message });
   }
 };
 
 
 
+// ⭐ DELETE BANNER
 export const deleteBanner = async (req, res) => {
   try {
     const { bannerId } = req.params;
-    if (!bannerId) return res.status(400).json({ message: 'Banner ID is required' });
+
+    if (!bannerId) {
+      return res.status(400).json({ message: "Banner ID is required" });
+    }
 
     const deletedBanner = await Banner.findByIdAndDelete(bannerId);
 
     if (!deletedBanner) {
-      return res.status(404).json({ message: 'Banner not found' });
+      return res.status(404).json({ message: "Banner not found" });
     }
 
     return res.status(200).json({
-      message: 'Banner deleted successfully!',
+      message: "Banner deleted successfully!",
       banner: deletedBanner,
     });
+
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: 'Error deleting banner', error: error.message });
+    console.error("Delete Banner Error:", error);
+    return res.status(500).json({ message: "Error deleting banner", error: error.message });
   }
 };
 
 
 
-
+// ⭐ GET ALL BANNERS
 export const getBanners = async (req, res) => {
   try {
     const banners = await Banner.find().sort({ createdAt: -1 });
 
     return res.status(200).json({
-      message: 'Banners fetched successfully!',
+      message: "Banners fetched successfully!",
       banners,
     });
+
   } catch (error) {
     console.error(error);
     return res.status(500).json({
-      message: 'Failed to fetch banners',
+      message: "Failed to fetch banners",
+      error: error.message,
+    });
+  }
+};
+
+
+
+// ⭐ GET BANNER BY ID (NEW)
+export const getBannerById = async (req, res) => {
+  try {
+    const { bannerId } = req.params;
+
+    const banner = await Banner.findById(bannerId);
+
+    if (!banner) {
+      return res.status(404).json({ message: "Banner not found" });
+    }
+
+    return res.status(200).json({
+      message: "Banner fetched successfully!",
+      banner,
+    });
+
+  } catch (error) {
+    console.error("Get Banner Error:", error);
+    return res.status(500).json({
+      message: "Failed to fetch banner",
       error: error.message,
     });
   }
