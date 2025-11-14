@@ -1,111 +1,81 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 
 const { Schema } = mongoose;
 
 const carSchema = new Schema({
-  carName: {
-    type: String,
+  categoryId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Category",
+    required: true
   },
-  model: {
-    type: String,
-  },
-  year: {
-    type: Number,
-  },
-  pricePerHour: {
-    type: Number,
-  },
-  pricePerDay: {
-    type: Number, // ✅ New field
-  },
+
+  carName: { type: String },
+  model: { type: String },
+  year: { type: Number },
+  pricePerHour: { type: Number },
+  pricePerDay: { type: Number },
+  delayPerHour: { type: Number },
+  delayPerDay: { type: Number },
+
   extendedPrice: {
-    perHour: {
-      type: Number, // ✅ Extended price per hour
-    },
-    perDay: {
-      type: Number, // ✅ Extended price per day
-    },
+    perHour: Number,
+    perDay: Number
   },
-  description: {
-    type: String,
-  },
+
+  description: { type: String },
+
   availabilityStatus: {
     type: Boolean,
-    default: true,
+    default: true
   },
-  delayPerHour: { type: Number },
-delayPerDay: { type: Number },
-vehicleNumber: { type: String },
+
+  vehicleNumber: { type: String },
+
   availability: [
     {
-      date: {
-        type: String,
-      },
-      timeSlots: [
-        {
-          type: String,
-        },
-      ],
+      date: String,
+      timeSlots: [String],
     },
   ],
-  carImage: {
-    type: [String],
-    default: [],
-  },
-  carDocs: {
-  type: [String],
-  default: [],
-},
-   runningStatus: {
+
+  carImage: { type: [String], default: [] },
+  carDocs: { type: [String], default: [] },
+
+  runningStatus: {
     type: String,
-    enum: ['Available', 'Booked'],
-    default: 'Available'
+    enum: ["Available", "Booked"],
+    default: "Available"
   },
-  location: {
-    type: String,
-  },
-  carType: {
-    type: String,
-  },
-  fuel: {
-    type: String,
-  },
-   // <-- Branch Info -->
+
+  location: { type: String },
+  carType: { type: String },
+  fuel: { type: String },
+  seats: { type: Number },
+  type: { type: String },
+
   branch: {
-    name: { type: String,}, // branch name like "Gachibowli"
-    location: {                            // GeoJSON Point for branch coords
+    name: { type: String },
+    location: {
       type: {
         type: String,
-        enum: ['Point'],
-        default: 'Point',
+        enum: ["Point"],
+        default: "Point"
       },
-      coordinates: { type: [Number], }, // [lng, lat]
-    },
+      coordinates: { type: [Number] }
+    }
   },
-  seats: {
-    type: Number,
-  },
-  type: {
-    type: String,
-  },
-   status: {
-    type: String,
-    enum: ['active', 'onHold'],  // ✅ Enum values
-    default: 'active',          // ✅ Default value
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now,
-  },
-});
 
+  status: {
+    type: String,
+    enum: ["active", "onHold"],
+    default: "active"
+  },
+
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
 
 carSchema.index({ "branch.location": "2dsphere" });
 
-
-const Car = mongoose.model('Car', carSchema);
+const Car = mongoose.model("Car", carSchema);
 export default Car;

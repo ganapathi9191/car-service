@@ -13,10 +13,12 @@ const storage = new CloudinaryStorage({
     if (file.fieldname === "licenseFront") folder = "docs/license/front";
     if (file.fieldname === "licenseBack") folder = "docs/license/back";
 
-    // ⭐ NEW: profile image upload
-    if (file.fieldname === "profileImage") folder = "profile/images";
+    // NEW (Required)
+    if (file.fieldname === "carImage") folder = "cars";
+    if (file.fieldname === "carDocs") folder = "car-docs";
 
-    // ⭐ NEW: banner image upload
+    // Profile & Banner
+    if (file.fieldname === "profileImage") folder = "profile/images";
     if (file.fieldname === "bannerImages") folder = "banners";
 
     return {

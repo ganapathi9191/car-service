@@ -5,7 +5,7 @@ const router = express.Router();
 
 
 // Route to add a new car
-router.post('/add-cars', addCar);
+router.post('/add-cars',upload.any(), addCar);
 
 // Route to get all cars
 router.get('/get-cars', getAllCars);

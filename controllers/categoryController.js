@@ -1,23 +1,42 @@
 import Category from "../models/categoryModel.js";
-import cloudinary from "../config/cloudinary.js";
+import cloudinary from "../config/cloudinary.js";  // ⭐ IMPORT CLOUDINARY
 
 // Create a new category
 export const createCategory = async (req, res) => {
   try {
     const { name } = req.body;
+
     if (!req.file) {
       return res.status(400).json({ success: false, message: "Category image is required" });
     }
 
-    // Get Cloudinary URL from multer storage
+    // ⭐ Check duplicate name
+    const existing = await Category.findOne({ name });
+    if (existing) {
+      return res.status(400).json({
+        success: false,
+        message: "Category name already exists",
+      });
+    }
+
     const imageUrl = req.file.path;
 
-    const category = await Category.create({ name, image: imageUrl });
+    const category = await Category.create({
+      name,
+      image: imageUrl,
+    });
 
-    res.status(201).json({ success: true, category });
+    res.status(201).json({
+      success: true,
+      message: "Category created successfully",
+      category,
+    });
   } catch (error) {
-    console.error("Error creating category:", error);
-    res.status(500).json({ success: false, message: "Failed to create category", error: error.message });
+    res.status(500).json({
+      success: false,
+      message: "Failed to create category",
+      error: error.message,
+    });
   }
 };
 
@@ -25,10 +44,19 @@ export const createCategory = async (req, res) => {
 export const getAllCategories = async (req, res) => {
   try {
     const categories = await Category.find().sort({ createdAt: -1 });
-    res.status(200).json({ success: true, count: categories.length, categories });
+
+    res.status(200).json({
+      success: true,
+      total: categories.length,
+      categories,
+    });
   } catch (error) {
     console.error("Error fetching categories:", error);
-    res.status(500).json({ success: false, message: "Failed to fetch categories", error: error.message });
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch categories",
+      error: error.message,
+    });
   }
 };
 
@@ -36,10 +64,24 @@ export const getAllCategories = async (req, res) => {
 export const getCategoryById = async (req, res) => {
   try {
     const category = await Category.findById(req.params.id);
-    if (!category) return res.status(404).json({ success: false, message: "Category not found" });
-    res.status(200).json({ success: true, category });
+
+    if (!category) {
+      return res.status(404).json({
+        success: false,
+        message: "Category not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      category,
+    });
   } catch (error) {
-    res.status(500).json({ success: false, message: "Failed to fetch category", error: error.message });
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch category",
+      error: error.message,
+    });
   }
 };
 
@@ -47,18 +89,38 @@ export const getCategoryById = async (req, res) => {
 export const updateCategory = async (req, res) => {
   try {
     const { name } = req.body;
+
     let updatedData = { name };
 
+    // ⭐ If new image uploaded → update Cloudinary URL
     if (req.file) {
-      updatedData.image = req.file.path; // New image URL
+      updatedData.image = req.file.path;
     }
 
-    const category = await Category.findByIdAndUpdate(req.params.id, updatedData, { new: true });
-    if (!category) return res.status(404).json({ success: false, message: "Category not found" });
+    const category = await Category.findByIdAndUpdate(
+      req.params.id,
+      updatedData,
+      { new: true }
+    );
 
-    res.status(200).json({ success: true, category });
+    if (!category) {
+      return res.status(404).json({
+        success: false,
+        message: "Category not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Category updated successfully",
+      category,
+    });
   } catch (error) {
-    res.status(500).json({ success: false, message: "Failed to update category", error: error.message });
+    res.status(500).json({
+      success: false,
+      message: "Failed to update category",
+      error: error.message,
+    });
   }
 };
 
@@ -66,10 +128,23 @@ export const updateCategory = async (req, res) => {
 export const deleteCategory = async (req, res) => {
   try {
     const category = await Category.findByIdAndDelete(req.params.id);
-    if (!category) return res.status(404).json({ success: false, message: "Category not found" });
 
-    res.status(200).json({ success: true, message: "Category deleted successfully" });
+    if (!category) {
+      return res.status(404).json({
+        success: false,
+        message: "Category not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Category deleted successfully",
+    });
   } catch (error) {
-    res.status(500).json({ success: false, message: "Failed to delete category", error: error.message });
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete category",
+      error: error.message,
+    });
   }
 };

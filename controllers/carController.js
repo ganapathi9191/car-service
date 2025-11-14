@@ -1,4 +1,5 @@
 import Car from "../models/carModel.js";
+import Category from "../models/categoryModel.js";
 import Banner from "../models/bannerModel.js";
 import cloudinary from "../config/cloudinary.js";
 import User from "../models/authModel.js";
@@ -9,6 +10,7 @@ import User from "../models/authModel.js";
 export const addCar = async (req, res) => {
   try {
     const {
+      categoryId,
       carName,
       model,
       year,
@@ -30,14 +32,23 @@ export const addCar = async (req, res) => {
       availability = [],
     } = req.body;
 
-    // ✅ Validate branch info
-    if (!branchName || !branchLat || !branchLng) {
-      return res.status(400).json({ message: 'Branch name, latitude, and longitude are required' });
+    // ✅ Validate categoryId
+    if (!categoryId) {
+      return res.status(400).json({ message: "categoryId is required" });
     }
 
-    // ✅ 1. Upload car images (if any)
-    let carImageUrls = [];
+    const categoryExists = await Category.findById(categoryId);
+    if (!categoryExists) {
+      return res.status(404).json({ message: "Category not found" });
+    }
 
+    // ✅ Validate branch info (no changes)
+    if (!branchName || !branchLat || !branchLng) {
+      return res.status(400).json({ message: "Branch name, latitude, and longitude are required" });
+    }
+
+    // ---------- IMAGE UPLOAD (NO CHANGES) ----------
+    let carImageUrls = [];
     if (req.files && req.files.carImage) {
       const images = Array.isArray(req.files.carImage)
         ? req.files.carImage
@@ -45,22 +56,21 @@ export const addCar = async (req, res) => {
 
       const uploadedImages = await Promise.all(
         images.map((img) =>
-          cloudinary.uploader.upload(img.tempFilePath, { folder: 'cars' })
+          cloudinary.uploader.upload(img.tempFilePath, { folder: "cars" })
         )
       );
 
-      carImageUrls = uploadedImages.map(img => img.secure_url);
+      carImageUrls = uploadedImages.map((img) => img.secure_url);
     } else if (req.body.carImage) {
-      if (typeof req.body.carImage === 'string') {
+      if (typeof req.body.carImage === "string") {
         carImageUrls = [req.body.carImage];
       } else if (Array.isArray(req.body.carImage)) {
         carImageUrls = req.body.carImage;
       }
     }
 
-    // ✅ 1.5 Upload car documents (if any)
+    // ---------- CAR DOCS UPLOAD (NO CHANGES) ----------
     let carDocUrls = [];
-
     if (req.files && req.files.carDocs) {
       const docs = Array.isArray(req.files.carDocs)
         ? req.files.carDocs
@@ -69,54 +79,54 @@ export const addCar = async (req, res) => {
       const uploadedDocs = await Promise.all(
         docs.map((doc) =>
           cloudinary.uploader.upload(doc.tempFilePath, {
-            folder: 'car-docs',
-            resource_type: 'auto' // handles PDFs, images, etc.
+            folder: "car-docs",
+            resource_type: "auto",
           })
         )
       );
 
-      carDocUrls = uploadedDocs.map(doc => doc.secure_url);
+      carDocUrls = uploadedDocs.map((doc) => doc.secure_url);
     } else if (req.body.carDocs) {
-      if (typeof req.body.carDocs === 'string') {
+      if (typeof req.body.carDocs === "string") {
         carDocUrls = [req.body.carDocs];
       } else if (Array.isArray(req.body.carDocs)) {
         carDocUrls = req.body.carDocs;
       }
     }
 
-    // ✅ 2. Parse extended price
+    // ---------- extendedPrice parse (NO CHANGES) ----------
     let parsedExtendedPrice = extendedPrice;
-    if (typeof extendedPrice === 'string') {
+    if (typeof extendedPrice === "string") {
       try {
         parsedExtendedPrice = JSON.parse(extendedPrice);
       } catch (err) {
-        return res.status(400).json({ message: 'Invalid extendedPrice JSON format' });
+        return res.status(400).json({ message: "Invalid extendedPrice JSON format" });
       }
     }
 
-    // ✅ 3. Parse availability
+    // ---------- availability parse (NO CHANGES) ----------
     let parsedAvailability = availability;
-    if (typeof availability === 'string') {
+    if (typeof availability === "string") {
       try {
         parsedAvailability = JSON.parse(availability);
       } catch (err) {
-        return res.status(400).json({ message: 'Invalid availability JSON format' });
+        return res.status(400).json({ message: "Invalid availability JSON format" });
       }
     }
 
     if (!Array.isArray(parsedAvailability)) {
-      return res.status(400).json({ message: 'Availability must be an array' });
+      return res.status(400).json({ message: "Availability must be an array" });
     }
 
-    parsedAvailability = parsedAvailability.map(entry => {
+    parsedAvailability = parsedAvailability.map((entry) => {
       if (!entry.date || !Array.isArray(entry.timeSlots)) {
         throw new Error('Each availability entry must have a valid "date" and "timeSlots"');
       }
 
       const d = new Date(entry.date);
       const yyyy = d.getFullYear();
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
       const formattedDate = `${yyyy}/${mm}/${dd}`;
 
       const timeFormat = /^\d{2}:\d{2}$/;
@@ -132,8 +142,9 @@ export const addCar = async (req, res) => {
       };
     });
 
-    // ✅ 4. Create Car document
+    // ---------- CREATE CAR (ONLY categoryId added) ----------
     const newCar = new Car({
+      categoryId,
       carName,
       model,
       year,
@@ -144,7 +155,7 @@ export const addCar = async (req, res) => {
       extendedPrice: parsedExtendedPrice,
       description,
       carImage: carImageUrls,
-      carDocs: carDocUrls, // ✅ add carDocs URLs here
+      carDocs: carDocUrls,
       location,
       carType,
       fuel,
@@ -152,11 +163,11 @@ export const addCar = async (req, res) => {
       seats,
       vehicleNumber,
       availability: parsedAvailability,
-      status: 'active',
+      status: "active",
       branch: {
         name: branchName,
         location: {
-          type: 'Point',
+          type: "Point",
           coordinates: [parseFloat(branchLng), parseFloat(branchLat)],
         },
       },
@@ -165,13 +176,12 @@ export const addCar = async (req, res) => {
     const savedCar = await newCar.save();
 
     return res.status(201).json({
-      message: 'Car added successfully!',
+      message: "Car added successfully!",
       car: savedCar,
     });
-
   } catch (err) {
-    console.error('Error in addCar:', err);
-    return res.status(500).json({ message: 'Error adding car', error: err.message });
+    console.error("Error in addCar:", err);
+    return res.status(500).json({ message: "Error adding car", error: err.message });
   }
 };
 
