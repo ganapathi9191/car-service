@@ -15,7 +15,7 @@ router.get('/allcars', AllCars)
 router.get('/getcar/:carId', getCarById);
 
 // Route to update a car by ID
-router.put('/updatecar/:carId', updateCar);
+router.put('/updatecar/:carId',upload.any(), updateCar);
 
 // Route to delete a car by ID
 router.post('/bannercreate', upload.array("bannerImages"), createBanner);

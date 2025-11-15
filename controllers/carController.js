@@ -1,16 +1,14 @@
+
 import Car from "../models/carModel.js";
-import Category from "../models/categoryModel.js";
 import Banner from "../models/bannerModel.js";
+import Category from "../models/categoryModel.js";
 import cloudinary from "../config/cloudinary.js";
 import User from "../models/authModel.js";
+
 // Add a new car
-
-
-
 export const addCar = async (req, res) => {
   try {
     const {
-      categoryId,
       carName,
       model,
       year,
@@ -30,103 +28,90 @@ export const addCar = async (req, res) => {
       branchLat,
       branchLng,
       availability = [],
+      availabilityStatus = true,
+      runningStatus = "Available",
+      categoryId,
     } = req.body;
 
-    // ✅ Validate categoryId
-    if (!categoryId) {
-      return res.status(400).json({ message: "categoryId is required" });
-    }
-
-    const categoryExists = await Category.findById(categoryId);
-    if (!categoryExists) {
-      return res.status(404).json({ message: "Category not found" });
-    }
-
-    // ✅ Validate branch info (no changes)
+    // ✅ Validate required fields
     if (!branchName || !branchLat || !branchLng) {
-      return res.status(400).json({ message: "Branch name, latitude, and longitude are required" });
+      return res.status(400).json({ message: 'Branch name, latitude, and longitude are required' });
     }
 
-    // ---------- IMAGE UPLOAD (NO CHANGES) ----------
+    if (!vehicleNumber || vehicleNumber.trim() === '') {
+      return res.status(400).json({ message: 'Vehicle number is required' });
+    }
+
+    // ✅ Validate category if provided
+    if (categoryId) {
+      const category = await Category.findById(categoryId);
+      if (!category) {
+        return res.status(404).json({ message: 'Category not found' });
+      }
+    }
+
+    // ✅ Check if vehicle number already exists
+    const existingCar = await Car.findOne({ vehicleNumber: vehicleNumber.trim() });
+    if (existingCar) {
+      return res.status(400).json({ message: 'Vehicle number already exists' });
+    }
+
+    // ✅ Group files by fieldname when using upload.any()
     let carImageUrls = [];
-    if (req.files && req.files.carImage) {
-      const images = Array.isArray(req.files.carImage)
-        ? req.files.carImage
-        : [req.files.carImage];
-
-      const uploadedImages = await Promise.all(
-        images.map((img) =>
-          cloudinary.uploader.upload(img.tempFilePath, { folder: "cars" })
-        )
-      );
-
-      carImageUrls = uploadedImages.map((img) => img.secure_url);
-    } else if (req.body.carImage) {
-      if (typeof req.body.carImage === "string") {
-        carImageUrls = [req.body.carImage];
-      } else if (Array.isArray(req.body.carImage)) {
-        carImageUrls = req.body.carImage;
-      }
-    }
-
-    // ---------- CAR DOCS UPLOAD (NO CHANGES) ----------
     let carDocUrls = [];
-    if (req.files && req.files.carDocs) {
-      const docs = Array.isArray(req.files.carDocs)
-        ? req.files.carDocs
-        : [req.files.carDocs];
 
-      const uploadedDocs = await Promise.all(
-        docs.map((doc) =>
-          cloudinary.uploader.upload(doc.tempFilePath, {
-            folder: "car-docs",
-            resource_type: "auto",
-          })
-        )
-      );
-
-      carDocUrls = uploadedDocs.map((doc) => doc.secure_url);
-    } else if (req.body.carDocs) {
-      if (typeof req.body.carDocs === "string") {
-        carDocUrls = [req.body.carDocs];
-      } else if (Array.isArray(req.body.carDocs)) {
-        carDocUrls = req.body.carDocs;
-      }
+    if (req.files && req.files.length > 0) {
+      req.files.forEach(file => {
+        if (file.fieldname === 'carImage') {
+          carImageUrls.push(file.path);
+        } else if (file.fieldname === 'carDocs') {
+          carDocUrls.push(file.path);
+        }
+      });
     }
 
-    // ---------- extendedPrice parse (NO CHANGES) ----------
+ 
+    // ✅ Parse extended price
     let parsedExtendedPrice = extendedPrice;
-    if (typeof extendedPrice === "string") {
+    if (typeof extendedPrice === 'string') {
       try {
         parsedExtendedPrice = JSON.parse(extendedPrice);
       } catch (err) {
-        return res.status(400).json({ message: "Invalid extendedPrice JSON format" });
+        return res.status(400).json({ message: 'Invalid extendedPrice JSON format' });
       }
     }
 
-    // ---------- availability parse (NO CHANGES) ----------
+    // Convert extendedPrice format if needed
+    if (parsedExtendedPrice && !parsedExtendedPrice.perHour) {
+      parsedExtendedPrice = {
+        perHour: parsedExtendedPrice['6hrs'] || pricePerHour,
+        perDay: parsedExtendedPrice['12hrs'] || pricePerDay
+      };
+    }
+
+    // ✅ Parse availability
     let parsedAvailability = availability;
-    if (typeof availability === "string") {
+    if (typeof availability === 'string') {
       try {
         parsedAvailability = JSON.parse(availability);
       } catch (err) {
-        return res.status(400).json({ message: "Invalid availability JSON format" });
+        return res.status(400).json({ message: 'Invalid availability JSON format' });
       }
     }
 
     if (!Array.isArray(parsedAvailability)) {
-      return res.status(400).json({ message: "Availability must be an array" });
+      parsedAvailability = [];
     }
 
-    parsedAvailability = parsedAvailability.map((entry) => {
+    parsedAvailability = parsedAvailability.map(entry => {
       if (!entry.date || !Array.isArray(entry.timeSlots)) {
         throw new Error('Each availability entry must have a valid "date" and "timeSlots"');
       }
 
       const d = new Date(entry.date);
       const yyyy = d.getFullYear();
-      const mm = String(d.getMonth() + 1).padStart(2, "0");
-      const dd = String(d.getDate()).padStart(2, "0");
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
       const formattedDate = `${yyyy}/${mm}/${dd}`;
 
       const timeFormat = /^\d{2}:\d{2}$/;
@@ -142,9 +127,8 @@ export const addCar = async (req, res) => {
       };
     });
 
-    // ---------- CREATE CAR (ONLY categoryId added) ----------
+    // ✅ Create Car document
     const newCar = new Car({
-      categoryId,
       carName,
       model,
       year,
@@ -152,7 +136,7 @@ export const addCar = async (req, res) => {
       pricePerDay,
       delayPerHour,
       delayPerDay,
-      extendedPrice: parsedExtendedPrice,
+      extendedPrice: parsedExtendedPrice || { perHour: pricePerHour, perDay: pricePerDay },
       description,
       carImage: carImageUrls,
       carDocs: carDocUrls,
@@ -161,41 +145,56 @@ export const addCar = async (req, res) => {
       fuel,
       type,
       seats,
-      vehicleNumber,
+      vehicleNumber: vehicleNumber.trim(),
       availability: parsedAvailability,
-      status: "active",
+      availabilityStatus: availabilityStatus === 'true' || availabilityStatus === true,
+      runningStatus: runningStatus || "Available",
+      status: 'active',
+      bookedStatus: [],
       branch: {
         name: branchName,
         location: {
-          type: "Point",
+          type: 'Point',
           coordinates: [parseFloat(branchLng), parseFloat(branchLat)],
         },
       },
+      categoryId: categoryId || null,
     });
 
     const savedCar = await newCar.save();
 
     return res.status(201).json({
-      message: "Car added successfully!",
+      message: 'Car added successfully!',
       car: savedCar,
     });
+
   } catch (err) {
-    console.error("Error in addCar:", err);
-    return res.status(500).json({ message: "Error adding car", error: err.message });
+    console.error('Error in addCar:', err);
+    
+    // Handle duplicate key error specifically
+    if (err.code === 11000) {
+      const field = Object.keys(err.keyPattern || {})[0];
+      return res.status(400).json({ 
+        message: `Duplicate ${field}: A car with this ${field} already exists`,
+        error: err.message 
+      });
+    }
+    
+    return res.status(500).json({ message: 'Error adding car', error: err.message });
   }
 };
 
 export const getAllCars = async (req, res) => {
   try {
-    const { start, end, time, type, fuel, seats, location } = req.query;
+    const { start, end, time, type, fuel, seats, location, categoryId } = req.query;
 
-    // Date format validation YYYY/MM/DD
     const dateRegex = /^\d{4}\/\d{2}\/\d{2}$/;
+
     if ((start && !dateRegex.test(start)) || (end && !dateRegex.test(end))) {
       return res.status(400).json({ message: 'Date must be in YYYY/MM/DD format' });
     }
 
-    // Date range array creation
+    // Build date range
     let dateRange = [];
     if (start && end) {
       const current = new Date(start.replace(/\//g, '-'));
@@ -210,11 +209,12 @@ export const getAllCars = async (req, res) => {
       }
     }
 
-    // Time slots array and validation
+    // Build time slot array
     let timeSlots = [];
     if (time) {
       timeSlots = time.split(',').map(t => t.trim());
       const timeRegex = /^\d{2}:\d{2}$/;
+
       for (const t of timeSlots) {
         if (!timeRegex.test(t)) {
           return res.status(400).json({ message: `Invalid time format: ${t}` });
@@ -222,19 +222,70 @@ export const getAllCars = async (req, res) => {
       }
     }
 
-    // Base filter (no status restriction)
-    const filter = {};
+    // Base filter
+    const filter = { status: 'active' };
 
-    // Apply filters for availability
-    if (dateRange.length && timeSlots.length) {
-      filter.$and = [
-        { 'availability.date': { $in: dateRange } },
-        { 'availability.timeSlots': { $in: timeSlots } }
-      ];
-    } else if (dateRange.length) {
-      filter['availability.date'] = { $in: dateRange };
-    } else if (timeSlots.length) {
-      filter['availability.timeSlots'] = { $in: timeSlots };
+    // -------------------------------------
+    // YOUR ORIGINAL FILTER (NOT REMOVED)
+    // -------------------------------------
+    if (dateRange.length > 0 || timeSlots.length > 0) {
+      filter.availability = {
+        $elemMatch: {
+          ...(dateRange.length > 0 && { date: { $in: dateRange } }),
+          ...(timeSlots.length > 0 && { timeSlots: { $in: timeSlots } })
+        }
+      };
+    }
+
+    // ---------------------------------------------------------
+    // 🔥 UNIVERSAL WORKING FILTER (ADDED — DOES NOT REMOVE OLD)
+    // ---------------------------------------------------------
+    if (dateRange.length > 0 || timeSlots.length > 0) {
+      filter.$expr = {
+        $gt: [
+          {
+            $size: {
+              $filter: {
+                input: "$availability",
+                as: "slot",
+                cond: {
+                  $and: [
+                    // DATE MATCH (convert ANY stored date to YYYY/MM/DD)
+                    ...(dateRange.length > 0
+                      ? [{
+                          $in: [
+                            {
+                              $dateToString: {
+                                format: "%Y/%m/%d",
+                                date: { $toDate: "$$slot.date" }
+                              }
+                            },
+                            dateRange
+                          ]
+                        }]
+                      : []),
+
+                    // TIME MATCH (deep nested timeSlots)
+                    ...(timeSlots.length > 0
+                      ? [{
+                          $gt: [
+                            {
+                              $size: {
+                                $setIntersection: ["$$slot.timeSlots", timeSlots]
+                              }
+                            },
+                            0
+                          ]
+                        }]
+                      : [])
+                  ]
+                }
+              }
+            }
+          },
+          0
+        ]
+      };
     }
 
     // Other filters
@@ -242,30 +293,29 @@ export const getAllCars = async (req, res) => {
     if (fuel) filter.fuel = fuel;
     if (seats) filter.seats = parseInt(seats);
     if (location) filter.location = new RegExp(location, 'i');
+    if (categoryId) filter.categoryId = categoryId;
 
-    // Query database
-    const cars = await Car.find(filter);
+    const cars = await Car.find(filter).populate('categoryId', 'name image');
 
     if (!cars.length) {
       return res.status(404).json({ message: 'No cars found with the provided filters' });
     }
 
     return res.status(200).json({
+      message: 'Available cars fetched successfully',
       total: cars.length,
       cars,
     });
+
   } catch (err) {
     console.error('Error in getAllCars:', err);
     return res.status(500).json({ message: 'Error fetching cars', error: err.message });
   }
 };
 
-
-
-
 export const AllCars = async (req, res) => {
   try {
-    const { userId, type, fuel, seats } = req.query;
+    const { userId, type, fuel, seats, categoryId } = req.query;
 
     if (!userId) {
       return res.status(400).json({ message: 'userId is required in query' });
@@ -296,15 +346,17 @@ export const AllCars = async (req, res) => {
     if (type) filter.type = type;
     if (fuel) filter.fuel = fuel;
     if (seats) filter.seats = parseInt(seats);
+    if (categoryId) filter.categoryId = categoryId;
 
-    const nearbyCars = await Car.find(filter);
+    const nearbyCars = await Car.find(filter).populate('categoryId', 'name image');
 
     if (!nearbyCars || nearbyCars.length === 0) {
       return res.status(404).json({ message: 'No nearby branch found' });
     }
 
     return res.status(200).json({
-      message: 'Nearby branches with available cars found successfully',
+      message: 'Available cars fetched successfully',
+      isGuest: false,
       cars: nearbyCars.map(car => ({
         _id: car._id,
         carName: car.carName,
@@ -326,7 +378,14 @@ export const AllCars = async (req, res) => {
         location: car.location,
         status: car.status,
         runningStatus: car.runningStatus,
-        branch: car.branch
+        availabilityStatus: car.availabilityStatus,
+        availability: car.availability || [],
+        bookedStatus: car.bookedStatus || [],
+        branch: car.branch,
+        categoryId: car.categoryId,
+        createdAt: car.createdAt,
+        updatedAt: car.updatedAt,
+        __v: car.__v
       }))
     });
 
@@ -339,13 +398,9 @@ export const AllCars = async (req, res) => {
   }
 };
 
-
-
-
-
 export const getCarsNearUser = async (req, res) => {
   try {
-    const { userId, maxDistance = 5000 /* in meters */, type, fuel, seats } = req.query;
+    const { userId, maxDistance = 5000, type, fuel, seats, categoryId } = req.query;
 
     if (!userId) {
       return res.status(400).json({ message: 'userId is required' });
@@ -375,31 +430,30 @@ export const getCarsNearUser = async (req, res) => {
 
     if (type) filter.type = type;
     if (fuel) filter.fuel = fuel;
-    if (seats) filter.seats = seats;
+    if (seats) filter.seats = parseInt(seats);
+    if (categoryId) filter.categoryId = categoryId;
 
-    const cars = await Car.find(filter);
+    const cars = await Car.find(filter).populate('categoryId', 'name image');
 
     if (!cars.length) {
       return res.status(404).json({ message: 'No cars found near your location' });
     }
 
-    res.status(200).json({ total: cars.length, cars });
+    res.status(200).json({ 
+      message: 'Available cars fetched successfully',
+      total: cars.length, 
+      cars 
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Error fetching cars', error: error.message });
   }
 };
 
-
-
-
-
-
-
 // Get a car by ID
 export const getCarById = async (req, res) => {
   try {
-    const car = await Car.findById(req.params.carId);
+    const car = await Car.findById(req.params.carId).populate('categoryId', 'name image');
     if (!car) {
       return res.status(404).json({ message: 'Car not found' });
     }
@@ -422,6 +476,8 @@ export const updateCar = async (req, res) => {
       year,
       pricePerHour,
       pricePerDay,
+      delayPerHour,
+      delayPerDay,
       extendedPrice,
       type,
       description,
@@ -429,58 +485,43 @@ export const updateCar = async (req, res) => {
       carType,
       fuel,
       seats,
+      vehicleNumber,
       availability = [],
+      availabilityStatus,
+      runningStatus,
       status,
+      branchName,
+      branchLat,
+      branchLng,
+      categoryId,
     } = req.body;
 
-    // ✅ 1. Upload new car images if provided
+    // ✅ Validate category if provided
+    if (categoryId) {
+      const category = await Category.findById(categoryId);
+      if (!category) {
+        return res.status(404).json({ message: 'Category not found' });
+      }
+    }
+
+    // ✅ Group files by fieldname when using upload.any()
     let carImageUrls = [];
-    if (req.files && req.files.carImage) {
-      const images = Array.isArray(req.files.carImage)
-        ? req.files.carImage
-        : [req.files.carImage];
-
-      const uploadedImages = await Promise.all(
-        images.map((img) =>
-          cloudinary.uploader.upload(img.tempFilePath, { folder: 'cars' })
-        )
-      );
-
-      carImageUrls = uploadedImages.map(img => img.secure_url);
-    } else if (req.body.carImage) {
-      if (typeof req.body.carImage === 'string') {
-        carImageUrls = [req.body.carImage];
-      } else if (Array.isArray(req.body.carImage)) {
-        carImageUrls = req.body.carImage;
-      }
-    }
-
-    // ✅ 1.5 Upload new car documents if provided
     let carDocUrls = [];
-    if (req.files && req.files.carDocs) {
-      const docs = Array.isArray(req.files.carDocs)
-        ? req.files.carDocs
-        : [req.files.carDocs];
 
-      const uploadedDocs = await Promise.all(
-        docs.map((doc) =>
-          cloudinary.uploader.upload(doc.tempFilePath, {
-            folder: 'car-docs',
-            resource_type: 'auto', // allow PDF, image, etc.
-          })
-        )
-      );
-
-      carDocUrls = uploadedDocs.map(doc => doc.secure_url);
-    } else if (req.body.carDocs) {
-      if (typeof req.body.carDocs === 'string') {
-        carDocUrls = [req.body.carDocs];
-      } else if (Array.isArray(req.body.carDocs)) {
-        carDocUrls = req.body.carDocs;
-      }
+    if (req.files && req.files.length > 0) {
+      req.files.forEach(file => {
+        if (file.fieldname === 'carImage') {
+          carImageUrls.push(file.path);
+        } else if (file.fieldname === 'carDocs') {
+          carDocUrls.push(file.path);
+        }
+      });
     }
 
-    // ✅ 2. Parse availability
+    console.log('Updated car images:', carImageUrls);
+    console.log('Updated car docs:', carDocUrls);
+
+    // ✅ Parse availability
     let parsedAvailability = availability;
     if (typeof availability === 'string') {
       try {
@@ -491,7 +532,7 @@ export const updateCar = async (req, res) => {
     }
 
     if (!Array.isArray(parsedAvailability)) {
-      return res.status(400).json({ message: 'availability must be an array' });
+      parsedAvailability = [];
     }
 
     for (const entry of parsedAvailability) {
@@ -502,7 +543,7 @@ export const updateCar = async (req, res) => {
       }
     }
 
-    // ✅ 3. Parse extended price
+    // ✅ Parse extended price
     let parsedExtendedPrice = extendedPrice;
     if (typeof extendedPrice === 'string') {
       try {
@@ -512,23 +553,29 @@ export const updateCar = async (req, res) => {
       }
     }
 
-    // ✅ 4. Prepare fields to update
-    const updatedFields = {
-      carName,
-      model,
-      year,
-      pricePerHour,
-      pricePerDay,
-      extendedPrice: parsedExtendedPrice,
-      description,
-      location,
-      carType,
-      fuel,
-      type,
-      seats,
-      availability: parsedAvailability,
-      status: status || 'active',
-    };
+    // ✅ Prepare fields to update
+    const updatedFields = {};
+
+    if (carName !== undefined) updatedFields.carName = carName;
+    if (model !== undefined) updatedFields.model = model;
+    if (year !== undefined) updatedFields.year = year;
+    if (pricePerHour !== undefined) updatedFields.pricePerHour = pricePerHour;
+    if (pricePerDay !== undefined) updatedFields.pricePerDay = pricePerDay;
+    if (delayPerHour !== undefined) updatedFields.delayPerHour = delayPerHour;
+    if (delayPerDay !== undefined) updatedFields.delayPerDay = delayPerDay;
+    if (parsedExtendedPrice !== undefined) updatedFields.extendedPrice = parsedExtendedPrice;
+    if (description !== undefined) updatedFields.description = description;
+    if (location !== undefined) updatedFields.location = location;
+    if (carType !== undefined) updatedFields.carType = carType;
+    if (fuel !== undefined) updatedFields.fuel = fuel;
+    if (type !== undefined) updatedFields.type = type;
+    if (seats !== undefined) updatedFields.seats = seats;
+    if (vehicleNumber !== undefined) updatedFields.vehicleNumber = vehicleNumber.trim();
+    if (parsedAvailability !== undefined) updatedFields.availability = parsedAvailability;
+    if (availabilityStatus !== undefined) updatedFields.availabilityStatus = availabilityStatus === 'true' || availabilityStatus === true;
+    if (runningStatus !== undefined) updatedFields.runningStatus = runningStatus;
+    if (status !== undefined) updatedFields.status = status;
+    if (categoryId !== undefined) updatedFields.categoryId = categoryId;
 
     if (carImageUrls.length > 0) {
       updatedFields.carImage = carImageUrls;
@@ -538,12 +585,23 @@ export const updateCar = async (req, res) => {
       updatedFields.carDocs = carDocUrls;
     }
 
-    // ✅ 5. Update DB
+    // Update branch if provided
+    if (branchName && branchLat && branchLng) {
+      updatedFields.branch = {
+        name: branchName,
+        location: {
+          type: 'Point',
+          coordinates: [parseFloat(branchLng), parseFloat(branchLat)],
+        },
+      };
+    }
+
+    // ✅ Update DB
     const updatedCar = await Car.findByIdAndUpdate(
       carId,
       updatedFields,
       { new: true, runValidators: true }
-    );
+    ).populate('categoryId', 'name image');
 
     if (!updatedCar) {
       return res.status(404).json({ message: 'Car not found' });
@@ -555,13 +613,23 @@ export const updateCar = async (req, res) => {
     });
   } catch (err) {
     console.error(err);
+    
+    // Handle duplicate key error
+    if (err.code === 11000) {
+      const field = Object.keys(err.keyPattern || {})[0];
+      return res.status(400).json({ 
+        message: `Duplicate ${field}: A car with this ${field} already exists`,
+        error: err.message 
+      });
+    }
+    
     return res.status(500).json({ message: 'Error updating car', error: err.message });
   }
 };
 
 // Delete a car by ID
 export const deleteCar = async (req, res) => {
- try {
+  try {
     const { carId } = req.params;
     if (!carId) return res.status(400).json({ message: 'Car ID is required' });
 
@@ -569,6 +637,21 @@ export const deleteCar = async (req, res) => {
 
     if (!deletedCar) {
       return res.status(404).json({ message: 'Car not found' });
+    }
+
+    // Optional: Delete images from Cloudinary
+    if (deletedCar.carImage && deletedCar.carImage.length > 0) {
+      for (const imageUrl of deletedCar.carImage) {
+        const publicId = imageUrl.split('/').slice(-2).join('/').split('.')[0];
+        await cloudinary.uploader.destroy(`cars/${publicId}`);
+      }
+    }
+
+    if (deletedCar.carDocs && deletedCar.carDocs.length > 0) {
+      for (const docUrl of deletedCar.carDocs) {
+        const publicId = docUrl.split('/').slice(-2).join('/').split('.')[0];
+        await cloudinary.uploader.destroy(`car-docs/${publicId}`, { resource_type: 'auto' });
+      }
     }
 
     return res.status(200).json({
